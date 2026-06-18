@@ -25,3 +25,17 @@ Do not turn the foundation into a hidden monolith. Keep domain workflows inside 
 ## Source of Truth
 
 Canonical architecture and MVP scope live in `../fg-docs`.
+
+## Development
+
+Run tests from this directory:
+
+```bash
+python -m pytest
+```
+
+Install development dependencies first if needed:
+
+```bash
+python -m pip install -e ".[dev]"
+```
