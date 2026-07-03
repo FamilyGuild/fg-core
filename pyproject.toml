@@ -7,8 +7,11 @@ name = "fg-core"
 version = "0.1.0"
 description = "Thin FamilyGuild foundation app."
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = []
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "dbzero>=0.3,<0.4",
+    "dbzero-modelkit>=1.1,<2",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

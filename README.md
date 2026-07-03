@@ -31,11 +31,12 @@ Canonical architecture and MVP scope live in `../fg-docs`.
 Run tests from this directory:
 
 ```bash
-python -m pytest
+./.venv/bin/python -m pytest
 ```
 
 Install development dependencies first if needed:
 
 ```bash
-python -m pip install -e ".[dev]"
+python3.12 -m venv .venv
+./.venv/bin/python -m pip install -e ".[dev]"
 ```

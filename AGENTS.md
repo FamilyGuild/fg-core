@@ -34,3 +34,10 @@ Use trusted member switching because the founder's own family is the first test 
 - Architecture: `../fg-docs/docs/architecture/modular-platform.md`
 - MVP plan: `../fg-docs/docs/product/mvp-plan.md`
 - Product strategy: `../fg-docs/docs/product/strategy.md`
+
+## AI Planning Documents
+
+- Follow the workspace-wide AI planning and implementation handoff workflow in `../AGENTS.md`.
+- Store `fg-core` plans and implementation summaries under `../fg-docs/AI_docs/fg-core/` using the scoped folder and naming rules from the root guide.
+- Treat `AI_docs/` files as non-canonical planning and handoff support. Promote lasting product, architecture, or task-workflow decisions into active English files under `../fg-docs/docs/` when they become source of truth.
+- Do not add `AI_docs/` files to `mkdocs.yml` navigation unless the developer explicitly asks.
