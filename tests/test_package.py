@@ -8,6 +8,7 @@ from fg_core.models import (
     Family,
     FamilyGuildAppState,
     Member,
+    MemberRole,
     ModuleRegistration,
 )
 
@@ -34,3 +35,10 @@ def test_core_models_are_dataclasses() -> None:
     assert is_dataclass(CorePreferences)
     assert is_dataclass(ModuleRegistration)
     assert is_dataclass(DashboardWidgetConfig)
+
+
+def test_member_role_is_constrained_dbzero_enum() -> None:
+    assert str(MemberRole.parent) == "parent"
+    assert str(MemberRole.child) == "child"
+    assert MemberRole["parent"] == MemberRole.parent
+    assert MemberRole["child"] == MemberRole.child

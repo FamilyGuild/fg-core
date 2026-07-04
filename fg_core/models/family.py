@@ -8,6 +8,11 @@ from datetime import datetime
 import dbzero as db0
 
 
+@db0.enum(values=["parent", "child"])
+class MemberRole:
+    """Constrained persisted roles for trusted member switching."""
+
+
 @db0.memo(id="/familyguild/core/Family")
 @dataclass
 class Family:
@@ -25,9 +30,9 @@ class Member:
     """Family member visible in trusted member switching."""
 
     display_name: str
-    role: str
+    role: MemberRole
     active: bool = True
-    kid_profile_ref: str | None = None
+    kid_profile_uuid: str | None = None
 
 
 @db0.memo(id="/familyguild/core/ActiveMemberState")

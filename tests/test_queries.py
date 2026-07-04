@@ -1,6 +1,14 @@
-from fg_core.commands import add_child_member, configure_dashboard_widget, enable_module
+import dbzero as db0
+
+from fg_core.commands import (
+    add_child_member,
+    configure_dashboard_widget,
+    enable_module,
+    switch_active_member,
+)
 from fg_core.models import CorePreferences, FamilyGuildAppState, ModuleRegistration
 from fg_core.queries import (
+    get_active_member_uuid,
     get_app_state,
     get_core_preferences,
     get_enabled_modules,
@@ -32,6 +40,15 @@ def test_get_core_preferences(app_state: FamilyGuildAppState) -> None:
 
     assert isinstance(preferences, CorePreferences)
     assert preferences is app_state.preferences
+
+
+def test_get_active_member_uuid_is_derived_from_active_member(app_state: FamilyGuildAppState) -> None:
+    assert get_active_member_uuid(app_state) is None
+
+    child = add_child_member(app_state, "Alex")
+    switch_active_member(app_state, child)
+
+    assert get_active_member_uuid(app_state) == db0.uuid(child)
 
 
 def test_member_switcher_options_include_only_active_members(app_state: FamilyGuildAppState) -> None:

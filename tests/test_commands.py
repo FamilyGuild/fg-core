@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-
 from fg_core.commands import (
     add_child_member,
     add_parent_member,
@@ -10,7 +9,7 @@ from fg_core.commands import (
     enable_module,
     switch_active_member,
 )
-from fg_core.models import CorePreferences, FamilyGuildAppState, Member
+from fg_core.models import CorePreferences, FamilyGuildAppState, Member, MemberRole
 from fg_core.queries import get_active_member
 
 
@@ -64,18 +63,20 @@ def test_add_parent_member(app_state: FamilyGuildAppState) -> None:
     parent = add_parent_member(app_state, "Ada")
 
     assert parent.display_name == "Ada"
-    assert parent.role == "parent"
+    assert parent.role == MemberRole.parent
+    assert str(parent.role) == "parent"
     assert parent.active is True
     assert parent in app_state.family.members
 
 
 def test_add_child_member(app_state: FamilyGuildAppState) -> None:
-    child = add_child_member(app_state, "Alex", kid_profile_ref="kid-profile-1")
+    child = add_child_member(app_state, "Alex", kid_profile_uuid="kid-profile-1")
 
     assert child.display_name == "Alex"
-    assert child.role == "child"
+    assert child.role == MemberRole.child
+    assert str(child.role) == "child"
     assert child.active is True
-    assert child.kid_profile_ref == "kid-profile-1"
+    assert child.kid_profile_uuid == "kid-profile-1"
     assert child in app_state.family.members
 
 
@@ -105,7 +106,7 @@ def test_switch_rejects_inactive_member(app_state: FamilyGuildAppState) -> None:
 def test_switch_rejects_unknown_member(app_state: FamilyGuildAppState) -> None:
     parent = add_parent_member(app_state, "Ada")
     switch_active_member(app_state, parent)
-    unknown_child = Member("Riley", "child")
+    unknown_child = Member("Riley", MemberRole.child)
 
     with pytest.raises(ValueError, match="belong"):
         switch_active_member(app_state, unknown_child)
@@ -150,7 +151,7 @@ def test_configure_dashboard_widget_creates_widget(app_state: FamilyGuildAppStat
     assert widget.module_key == "kidland"
     assert widget.widget_key == "famcoins_balance"
     assert widget.enabled is True
-    assert widget.visible_for_role == "child"
+    assert widget.visible_for_role == MemberRole.child
     assert widget.visible_for_member is child
     assert widget.position == 2
     assert widget in app_state.family.dashboard_widgets
@@ -170,13 +171,13 @@ def test_configure_dashboard_widget_updates_existing_widget(app_state: FamilyGui
 
     assert updated_widget is widget
     assert updated_widget.enabled is False
-    assert updated_widget.visible_for_role == "parent"
+    assert updated_widget.visible_for_role == MemberRole.parent
     assert updated_widget.position == 1
     assert len(app_state.family.dashboard_widgets) == 1
 
 
 def test_configure_dashboard_widget_rejects_unknown_visible_member(app_state: FamilyGuildAppState) -> None:
-    unknown_child = Member("Riley", "child")
+    unknown_child = Member("Riley", MemberRole.child)
 
     with pytest.raises(ValueError, match="visible_for_member"):
         configure_dashboard_widget(
@@ -185,3 +186,14 @@ def test_configure_dashboard_widget_rejects_unknown_visible_member(app_state: Fa
             "famcoins_balance",
             visible_for_member=unknown_child,
         )
+
+
+def test_configure_dashboard_widget_rejects_unknown_visible_role(app_state: FamilyGuildAppState) -> None:
+    with pytest.raises(ValueError, match="role"):
+        configure_dashboard_widget(
+            app_state,
+            "kidland",
+            "famcoins_balance",
+            visible_for_role="manager",
+        )
+

@@ -2,6 +2,8 @@
 
 from typing import Any
 
+import dbzero as db0
+
 from fg_core.models import (
     CorePreferences,
     DashboardWidgetConfig,
@@ -67,6 +69,22 @@ def get_active_member(app_state: FamilyGuildAppState) -> Member | None:
     """
 
     return app_state.active_member_state.active_member
+
+
+def get_active_member_uuid(app_state: FamilyGuildAppState) -> str | None:
+    """Return the dbzero UUID for the current trusted member when selected.
+
+    Args:
+        app_state: Root app state that owns active member state.
+
+    Returns:
+        The selected member's dbzero UUID, or `None` when no member is active.
+    """
+
+    active_member = get_active_member(app_state)
+    if active_member is None:
+        return None
+    return db0.uuid(active_member)
 
 
 def get_member_switcher_options(app_state: FamilyGuildAppState) -> list[Member]:

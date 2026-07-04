@@ -1,5 +1,7 @@
 """Explicit commands that mutate FamilyGuild Core state."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 
 import dbzero as db0
@@ -12,11 +14,15 @@ from fg_core.models import (
     Family,
     FamilyGuildAppState,
     Member,
+    MemberRole,
     ModuleRegistration,
 )
 
 SUPPORTED_LANGUAGES = {"en", "pl"}
-SUPPORTED_MEMBER_ROLES = {"parent", "child"}
+SUPPORTED_MEMBER_ROLES = {
+    "parent": MemberRole.parent,
+    "child": MemberRole.child,
+}
 
 
 def create_family(
@@ -37,15 +43,9 @@ def create_family(
         The singleton `FamilyGuildAppState` root.
 
     Raises:
-        ValueError: If a text field is empty or the language is unsupported.
+        ValueError: If the language is unsupported.
     """
 
-    family_display_name = _require_non_empty(
-        family_display_name,
-        "family_display_name",
-    )
-    currency_name = _require_non_empty(currency_name, "currency_name")
-    household_key = _require_non_empty(household_key, "household_key")
     _validate_language_preference(language_preference)
 
     with db0.atomic():
@@ -72,33 +72,29 @@ def add_parent_member(app_state: FamilyGuildAppState, display_name: str) -> Memb
     Returns:
         The created parent `Member`.
 
-    Raises:
-        ValueError: If the display name is empty.
     """
 
-    return _add_member(app_state, display_name, "parent")
+    return _add_member(app_state, display_name, MemberRole.parent)
 
 
 def add_child_member(
     app_state: FamilyGuildAppState,
     display_name: str,
-    kid_profile_ref: str | None = None,
+    kid_profile_uuid: str | None = None,
 ) -> Member:
     """Add an active child member to a family.
 
     Args:
         app_state: Root app state whose household should own the member.
         display_name: Member name shown in trusted switching.
-        kid_profile_ref: Optional module-owned KidLand profile reference.
+        kid_profile_uuid: Optional dbzero UUID handle for a module-owned KidLand profile.
 
     Returns:
         The created child `Member`.
 
-    Raises:
-        ValueError: If the display name is empty.
     """
 
-    return _add_member(app_state, display_name, "child", kid_profile_ref)
+    return _add_member(app_state, display_name, MemberRole.child, kid_profile_uuid)
 
 
 def switch_active_member(
@@ -150,11 +146,8 @@ def enable_module(
     Returns:
         The created or updated `ModuleRegistration`.
 
-    Raises:
-        ValueError: If the module key or label text is empty.
     """
 
-    module_key = _require_non_empty(module_key, "module_key")
     existing_module = _find_module(app_state.family, module_key)
 
     with db0.atomic():
@@ -206,14 +199,15 @@ def configure_dashboard_widget(
         The created or updated `DashboardWidgetConfig`.
 
     Raises:
-        ValueError: If keys are empty, role is unsupported, or member visibility
-            references a member outside the family.
+        ValueError: If the role is unsupported or member visibility references
+            a member outside the family.
     """
 
-    module_key = _require_non_empty(module_key, "module_key")
-    widget_key = _require_non_empty(widget_key, "widget_key")
-    if visible_for_role is not None:
-        _validate_member_role(visible_for_role)
+    visible_for_role_value = (
+        _coerce_member_role(visible_for_role)
+        if visible_for_role is not None
+        else None
+    )
     if visible_for_member is not None and visible_for_member not in app_state.family.members:
         raise ValueError("visible_for_member must belong to the family")
 
@@ -225,7 +219,7 @@ def configure_dashboard_widget(
                 module_key=module_key,
                 widget_key=widget_key,
                 enabled=enabled,
-                visible_for_role=visible_for_role,
+                visible_for_role=visible_for_role_value,
                 visible_for_member=visible_for_member,
                 position=position,
             )
@@ -233,7 +227,7 @@ def configure_dashboard_widget(
         else:
             widget = existing_widget
             widget.enabled = enabled
-            widget.visible_for_role = visible_for_role
+            widget.visible_for_role = visible_for_role_value
             widget.visible_for_member = visible_for_member
             widget.position = position
 
@@ -243,14 +237,13 @@ def configure_dashboard_widget(
 def _add_member(
     app_state: FamilyGuildAppState,
     display_name: str,
-    role: str,
-    kid_profile_ref: str | None = None,
+    role: MemberRole,
+    kid_profile_uuid: str | None = None,
 ) -> Member:
-    display_name = _require_non_empty(display_name, "display_name")
-    _validate_member_role(role)
+    role = _coerce_member_role(role)
 
     with db0.atomic():
-        member = Member(display_name, role, active=True, kid_profile_ref=kid_profile_ref)
+        member = Member(display_name, role, active=True, kid_profile_uuid=kid_profile_uuid)
         app_state.family.members.append(member)
 
     return member
@@ -274,27 +267,27 @@ def _find_widget(
     return None
 
 
-def _require_non_empty(value: str, field_name: str) -> str:
-    cleaned = value.strip()
-    if not cleaned:
-        raise ValueError(f"{field_name} cannot be empty")
-    return cleaned
-
-
 def _validate_language_preference(language_preference: str) -> None:
     if language_preference not in SUPPORTED_LANGUAGES:
         raise ValueError("language_preference must be 'en' or 'pl'")
 
 
-def _validate_member_role(role: str) -> None:
-    if role not in SUPPORTED_MEMBER_ROLES:
+def _coerce_member_role(role: str | MemberRole) -> MemberRole:
+    if role in MemberRole.values():
+        return role
+    if isinstance(role, str):
+        if role in SUPPORTED_MEMBER_ROLES:
+            return SUPPORTED_MEMBER_ROLES[role]
+
+    if isinstance(role, str):
         raise ValueError("role must be 'parent' or 'child'")
+    raise ValueError("role must be MemberRole.parent or MemberRole.child")
 
 
 def _to_ml_string(value: str | ML_String) -> ML_String:
     if isinstance(value, ML_String):
         return value
-    return ML_String(_require_non_empty(value, "label"), _language_code("en"))
+    return ML_String(value, _language_code("en"))
 
 
 def _language_code(language: str):
