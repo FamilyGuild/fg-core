@@ -41,3 +41,7 @@ Use trusted member switching because the founder's own family is the first test 
 - Store `fg-core` plans and implementation summaries under `../fg-docs/AI_docs/fg-core/` using the scoped folder and naming rules from the root guide.
 - Treat `AI_docs/` files as non-canonical planning and handoff support. Promote lasting product, architecture, or task-workflow decisions into active English files under `../fg-docs/docs/` when they become source of truth.
 - Do not add `AI_docs/` files to `mkdocs.yml` navigation unless the developer explicitly asks.
+
+## Dependency Default
+
+- Use `dbzero-pro>=0.6.0` as the distribution dependency while retaining `import dbzero as db0` and dbzero state-management terminology.

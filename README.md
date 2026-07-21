@@ -37,6 +37,11 @@ Run tests from this directory:
 Install development dependencies first if needed:
 
 ```bash
+cd ..
+bash scripts/login_aws_codeartifacts.sh
+cd fg-core
 python3.12 -m venv .venv
 ./.venv/bin/python -m pip install -e ".[dev]"
 ```
+
+`dbzero-pro>=0.6.0` is the distribution dependency; runtime code retains `import dbzero as db0`. AWS credentials and the temporary pip token stay outside this repository. Run `bash ../scripts/logout_aws_codeartifacts.sh` from the workspace root when you want to restore the prior user pip index URL.
