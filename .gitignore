@@ -35,3 +35,5 @@ coverage.xml
 .DS_Store
 Thumbs.db
 *.log
+
+opencode.json

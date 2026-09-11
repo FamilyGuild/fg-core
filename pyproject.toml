@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "dbzero-pro>=0.6.0",
-    "dbzero-modelkit>=1.2,
+    "dbzero-modelkit>=1.2",
 ]
 
 [project.optional-dependencies]

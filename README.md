@@ -44,4 +44,4 @@ python3.12 -m venv .venv
 ./.venv/bin/python -m pip install -e ".[dev]"
 ```
 
-`dbzero-pro>=0.6.0` is the distribution dependency; runtime code retains `import dbzero as db0`. AWS credentials and the temporary pip token stay outside this repository. Run `bash ../scripts/logout_aws_codeartifacts.sh` from the workspace root when you want to restore the prior user pip index URL.
+`dbzero-pro>=0.6.0` is the distribution dependency; runtime code retains `import dbzero as db0`. AWS credentials and the temporary pip token stay outside this repository. Run `bash ../scripts/logout_aws_codeartifacts.sh` from this subproject directory when you want to restore the prior user pip index URL.

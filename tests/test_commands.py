@@ -1,6 +1,9 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
+import dbzero as db0
 import pytest
+
 from fg_core.commands import (
     add_child_member,
     add_parent_member,
@@ -114,6 +117,68 @@ def test_switch_rejects_unknown_member(app_state: FamilyGuildAppState) -> None:
     assert get_active_member(app_state) is parent
 
 
+def test_switch_rejects_value_equal_nonmember(app_state: FamilyGuildAppState) -> None:
+    parent = add_parent_member(app_state, "Ada")
+    switched_at = datetime(2026, 6, 20, 12, 0, tzinfo=UTC)
+    switch_active_member(app_state, parent, switched_at=switched_at)
+    detached = Member("Ada", MemberRole.parent)
+    assert detached == parent
+    assert db0.uuid(detached) != db0.uuid(parent)
+
+    with pytest.raises(ValueError, match="belong"):
+        switch_active_member(app_state, detached)
+
+    assert db0.uuid(get_active_member(app_state)) == db0.uuid(parent)
+    assert app_state.active_member_state.last_switched_at == switched_at
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_widget_rejects_value_equal_nonmember(
+    app_state: FamilyGuildAppState, existing: bool
+) -> None:
+    child = add_child_member(app_state, "Alex")
+    detached = Member("Alex", MemberRole.child)
+    assert detached == child
+    assert db0.uuid(detached) != db0.uuid(child)
+    if existing:
+        configure_dashboard_widget(
+            app_state, "kidland", "balance", visible_for_member=child, position=2
+        )
+
+    with pytest.raises(ValueError, match="visible_for_member"):
+        configure_dashboard_widget(
+            app_state, "kidland", "balance", enabled=False,
+            visible_for_member=detached, position=9,
+        )
+
+    widgets = app_state.family.dashboard_widgets
+    assert len(widgets) == (1 if existing else 0)
+    if existing:
+        assert db0.uuid(widgets[0].visible_for_member) == db0.uuid(child)
+        assert widgets[0].enabled is True
+        assert widgets[0].position == 2
+
+
+def test_member_commands_accept_refetched_member_after_reopen(
+    app_state: FamilyGuildAppState, dbzero_state: Path
+) -> None:
+    child = add_child_member(app_state, "Alex")
+    member_uuid = db0.uuid(child)
+    db0.commit()
+    db0.close()
+    db0.init(str(dbzero_state / "db0"), prefix="core")
+    restored_state = FamilyGuildAppState()
+    restored_member = db0.fetch(member_uuid, Member)
+
+    active_state = switch_active_member(restored_state, restored_member)
+    widget = configure_dashboard_widget(
+        restored_state, "kidland", "balance", visible_for_member=restored_member
+    )
+
+    assert db0.uuid(active_state.active_member) == member_uuid
+    assert db0.uuid(widget.visible_for_member) == member_uuid
+
+
 def test_enable_kidland_module(app_state: FamilyGuildAppState) -> None:
     module = enable_module(app_state, "kidland", "KidLand")
 
@@ -196,4 +261,3 @@ def test_configure_dashboard_widget_rejects_unknown_visible_role(app_state: Fami
             "famcoins_balance",
             visible_for_role="manager",
         )
-

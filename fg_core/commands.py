@@ -116,7 +116,8 @@ def switch_active_member(
         ValueError: If the member does not belong to the family or is inactive.
     """
 
-    if member not in app_state.family.members:
+    member_uuid = db0.uuid(member)
+    if not any(db0.uuid(candidate) == member_uuid for candidate in app_state.family.members):
         raise ValueError("member must belong to the family")
     if not member.active:
         raise ValueError("inactive members cannot become active")
@@ -208,8 +209,10 @@ def configure_dashboard_widget(
         if visible_for_role is not None
         else None
     )
-    if visible_for_member is not None and visible_for_member not in app_state.family.members:
-        raise ValueError("visible_for_member must belong to the family")
+    if visible_for_member is not None:
+        member_uuid = db0.uuid(visible_for_member)
+        if not any(db0.uuid(candidate) == member_uuid for candidate in app_state.family.members):
+            raise ValueError("visible_for_member must belong to the family")
 
     existing_widget = _find_widget(app_state.family, module_key, widget_key)
 
