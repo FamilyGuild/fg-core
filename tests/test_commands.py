@@ -3,6 +3,7 @@ from pathlib import Path
 
 import dbzero as db0
 import pytest
+from dbzero_modelkit import LanguageCode, ML_String
 
 from fg_core.commands import (
     add_child_member,
@@ -14,6 +15,102 @@ from fg_core.commands import (
 )
 from fg_core.models import CorePreferences, FamilyGuildAppState, Member, MemberRole
 from fg_core.queries import get_active_member
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
+@pytest.mark.parametrize("field", ["family_display_name", "currency_name", "household_key"])
+def test_create_family_rejects_blank_inputs(field: str, blank: str) -> None:
+    arguments = {"family_display_name": "Guild House", field: blank}
+    with pytest.raises(ValueError, match=field):
+        create_family(**arguments)
+
+    state = create_family("Valid Family")
+    assert state.preferences.family_display_name == "Valid Family"
+    assert state.family.household_key == "default"
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
+@pytest.mark.parametrize("child", [False, True])
+def test_add_member_rejects_blank_name(
+    app_state: FamilyGuildAppState, blank: str, child: bool
+) -> None:
+    parent = add_parent_member(app_state, "Ada")
+    command = add_child_member if child else add_parent_member
+    with pytest.raises(ValueError, match="display_name"):
+        command(app_state, blank)
+    assert [db0.uuid(member) for member in app_state.family.members] == [db0.uuid(parent)]
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
+@pytest.mark.parametrize("field", ["module_key", "display_name", "navigation_label"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_enable_module_rejects_blank_inputs(
+    app_state: FamilyGuildAppState, blank: str, field: str, existing: bool
+) -> None:
+    if existing:
+        module = enable_module(app_state, "kidland", "Original", "Navigation")
+        module.enabled = False
+    arguments = {"module_key": "kidland", "display_name": "Updated", field: blank}
+    with pytest.raises(ValueError, match=field):
+        enable_module(app_state, **arguments)
+    assert len(app_state.family.enabled_modules) == int(existing)
+    if existing:
+        assert module.enabled is False
+        assert module.display_name.value == "Original"
+        assert module.navigation_label.value == "Navigation"
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
+@pytest.mark.parametrize("field", ["display_name", "navigation_label"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_enable_module_rejects_blank_multilingual_labels(
+    app_state: FamilyGuildAppState, blank: str, field: str, existing: bool
+) -> None:
+    if existing:
+        module = enable_module(app_state, "kidland", "Original", "Navigation")
+        module.enabled = False
+    label = ML_String(blank, LanguageCode.LEN)
+    with pytest.raises(ValueError, match=field):
+        enable_module(
+            app_state, "kidland", label if field == "display_name" else "Updated",
+            navigation_label=label if field == "navigation_label" else None,
+        )
+    assert len(app_state.family.enabled_modules) == int(existing)
+    if existing:
+        assert module.enabled is False
+        assert module.display_name.value == "Original"
+        assert module.navigation_label.value == "Navigation"
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
+@pytest.mark.parametrize("field", ["module_key", "widget_key"])
+def test_widget_rejects_blank_identifiers(
+    app_state: FamilyGuildAppState, blank: str, field: str
+) -> None:
+    widget = configure_dashboard_widget(app_state, "kidland", "balance", position=2)
+    arguments = {"module_key": "kidland", "widget_key": "balance", field: blank}
+    with pytest.raises(ValueError, match=field):
+        configure_dashboard_widget(app_state, **arguments, enabled=False, position=9)
+    assert len(app_state.family.dashboard_widgets) == 1
+    assert widget.enabled is True
+    assert widget.position == 2
+
+
+def test_commands_preserve_nonblank_text() -> None:
+    state = create_family(" Family ", currency_name=" Coins ", household_key=" home ")
+    assert state.preferences.family_display_name == " Family "
+    assert state.preferences.currency_name == " Coins "
+    assert state.family.household_key == " home "
+    assert add_parent_member(state, " Ada ").display_name == " Ada "
+    assert add_child_member(state, " Alex ").display_name == " Alex "
+    label = ML_String(" Module ", LanguageCode.LEN)
+    module = enable_module(state, " module ", label)
+    assert module.module_key == " module "
+    assert module.display_name.value == " Module "
+    assert db0.uuid(module.navigation_label) == db0.uuid(label)
+    widget = configure_dashboard_widget(state, " module ", " widget ")
+    assert widget.module_key == " module "
+    assert widget.widget_key == " widget "
 
 
 def test_create_family_initializes_singleton_root() -> None:

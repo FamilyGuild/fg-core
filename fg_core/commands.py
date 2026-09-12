@@ -43,9 +43,13 @@ def create_family(
         The singleton `FamilyGuildAppState` root.
 
     Raises:
-        ValueError: If the language is unsupported.
+        ValueError: If a required name or household key is blank, or the language
+            is unsupported.
     """
 
+    _validate_required_text(family_display_name, "family_display_name")
+    _validate_required_text(currency_name, "currency_name")
+    _validate_required_text(household_key, "household_key")
     _validate_language_preference(language_preference)
 
     with db0.atomic():
@@ -72,6 +76,8 @@ def add_parent_member(app_state: FamilyGuildAppState, display_name: str) -> Memb
     Returns:
         The created parent `Member`.
 
+    Raises:
+        ValueError: If the display name is blank.
     """
 
     return _add_member(app_state, display_name, MemberRole.parent)
@@ -92,6 +98,8 @@ def add_child_member(
     Returns:
         The created child `Member`.
 
+    Raises:
+        ValueError: If the display name is blank.
     """
 
     return _add_member(app_state, display_name, MemberRole.child, kid_profile_uuid)
@@ -147,8 +155,14 @@ def enable_module(
     Returns:
         The created or updated `ModuleRegistration`.
 
+    Raises:
+        ValueError: If the module key or a supplied label is blank.
     """
 
+    _validate_required_text(module_key, "module_key")
+    _validate_required_text(display_name, "display_name")
+    if navigation_label is not None:
+        _validate_required_text(navigation_label, "navigation_label")
     existing_module = _find_module(app_state.family, module_key)
 
     with db0.atomic():
@@ -200,10 +214,12 @@ def configure_dashboard_widget(
         The created or updated `DashboardWidgetConfig`.
 
     Raises:
-        ValueError: If the role is unsupported or member visibility references
-            a member outside the family.
+        ValueError: If a module or widget key is blank, the role is unsupported,
+            or member visibility references a member outside the family.
     """
 
+    _validate_required_text(module_key, "module_key")
+    _validate_required_text(widget_key, "widget_key")
     visible_for_role_value = (
         _coerce_member_role(visible_for_role)
         if visible_for_role is not None
@@ -243,6 +259,7 @@ def _add_member(
     role: MemberRole,
     kid_profile_uuid: str | None = None,
 ) -> Member:
+    _validate_required_text(display_name, "display_name")
     role = _coerce_member_role(role)
 
     with db0.atomic():
@@ -268,6 +285,13 @@ def _find_widget(
         if widget.module_key == module_key and widget.widget_key == widget_key:
             return widget
     return None
+
+
+def _validate_required_text(value: str | ML_String, field: str) -> None:
+    """Reject blank command input without normalizing the stored value."""
+    text = value.value if isinstance(value, ML_String) else value
+    if not text.strip():
+        raise ValueError(f"{field} must not be blank")
 
 
 def _validate_language_preference(language_preference: str) -> None:
