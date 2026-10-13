@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import dbzero as db0
 from dbzero_modelkit import LanguageCode, ML_String
 
 from fg_core.models import (
-    ActiveMemberState,
-    CorePreferences,
     DashboardWidgetConfig,
     Family,
     FamilyGuildAppState,
@@ -53,15 +49,11 @@ def create_family(
     _validate_language_preference(language_preference)
 
     with db0.atomic():
-        app_state = FamilyGuildAppState(
-            family=Family(household_key),
-            preferences=CorePreferences(
-                family_display_name=family_display_name,
-                currency_name=currency_name,
-                language_preference=language_preference,
-            ),
-            active_member_state=ActiveMemberState(),
-        )
+        app_state = FamilyGuildAppState()
+        app_state.family.household_key = household_key
+        app_state.preferences.family_display_name = family_display_name
+        app_state.preferences.currency_name = currency_name
+        app_state.preferences.language_preference = language_preference
 
     return app_state
 
@@ -103,39 +95,6 @@ def add_child_member(
     """
 
     return _add_member(app_state, display_name, MemberRole.child, kid_profile_uuid)
-
-
-def switch_active_member(
-    app_state: FamilyGuildAppState,
-    member: Member,
-    switched_at: datetime | None = None,
-) -> ActiveMemberState:
-    """Switch the trusted active member for the local MVP shell.
-
-    Args:
-        app_state: Root app state whose household members may be selected.
-        member: Active family member to select.
-        switched_at: Optional timestamp for deterministic callers or tests.
-
-    Returns:
-        The root-owned `ActiveMemberState` after the switch.
-
-    Raises:
-        ValueError: If the member does not belong to the family or is inactive.
-    """
-
-    member_uuid = db0.uuid(member)
-    if not any(db0.uuid(candidate) == member_uuid for candidate in app_state.family.members):
-        raise ValueError("member must belong to the family")
-    if not member.active:
-        raise ValueError("inactive members cannot become active")
-
-    with db0.atomic():
-        active_state = app_state.active_member_state
-        active_state.active_member = member
-        active_state.last_switched_at = switched_at or datetime.now(UTC)
-
-    return active_state
 
 
 def enable_module(

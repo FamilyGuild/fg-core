@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import dbzero as db0
 
-from fg_core.models.family import ActiveMemberState, Family
+from fg_core.models.family import Family
 from fg_core.models.preferences import CorePreferences
 
 
@@ -17,4 +17,3 @@ class FamilyGuildAppState:
 
     family: Family = field(default_factory=Family)
     preferences: CorePreferences = field(default_factory=CorePreferences)
-    active_member_state: ActiveMemberState = field(default_factory=ActiveMemberState)

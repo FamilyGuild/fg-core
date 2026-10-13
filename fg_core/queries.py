@@ -58,33 +58,27 @@ def get_core_preferences(app_state: FamilyGuildAppState) -> CorePreferences:
     return app_state.preferences
 
 
-def get_active_member(app_state: FamilyGuildAppState) -> Member | None:
-    """Return the current trusted member, if one has been selected.
+def resolve_trusted_member(
+    app_state: FamilyGuildAppState, member_id: str | None
+) -> Member | None:
+    """Resolve a client-selected identifier to an active household member.
 
     Args:
-        app_state: Root app state that owns active member state.
+        app_state: Root app state whose household owns selectable members.
+        member_id: dbzero UUID stored by one client context, or `None`.
 
     Returns:
-        The selected `Member`, or `None` when no member is active.
+        The active household `Member` with the identifier, or `None` when the
+        identifier is absent, unknown, or belongs to an inactive member.
     """
 
-    return app_state.active_member_state.active_member
-
-
-def get_active_member_uuid(app_state: FamilyGuildAppState) -> str | None:
-    """Return the dbzero UUID for the current trusted member when selected.
-
-    Args:
-        app_state: Root app state that owns active member state.
-
-    Returns:
-        The selected member's dbzero UUID, or `None` when no member is active.
-    """
-
-    active_member = get_active_member(app_state)
-    if active_member is None:
+    if not member_id:
         return None
-    return db0.uuid(active_member)
+
+    for member in app_state.family.members:
+        if member.active and db0.uuid(member) == member_id:
+            return member
+    return None
 
 
 def get_member_switcher_options(app_state: FamilyGuildAppState) -> list[Member]:

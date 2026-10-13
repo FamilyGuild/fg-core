@@ -30,6 +30,8 @@ coverage.xml
 .env
 .env.*
 !.env.example
+app-data/
+.nicegui/
 
 # Editor, OS, and local logs
 .DS_Store

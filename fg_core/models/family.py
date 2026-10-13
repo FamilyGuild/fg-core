@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 
 import dbzero as db0
 
@@ -33,12 +32,3 @@ class Member:
     role: MemberRole
     active: bool = True
     kid_profile_uuid: str | None = None
-
-
-@db0.memo(id="/familyguild/core/ActiveMemberState")
-@dataclass
-class ActiveMemberState:
-    """Current trusted member selection for the local private MVP."""
-
-    active_member: Member | None = None
-    last_switched_at: datetime | None = None

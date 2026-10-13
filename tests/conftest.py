@@ -53,5 +53,10 @@ def child_member(app_state: FamilyGuildAppState) -> Member:
 
 
 @pytest.fixture
+def duplicate_child_members(app_state: FamilyGuildAppState) -> tuple[Member, Member]:
+    return add_child_member(app_state, "Alex"), add_child_member(app_state, "Alex")
+
+
+@pytest.fixture
 def kidland_module(app_state: FamilyGuildAppState) -> ModuleRegistration:
     return enable_module(app_state, "kidland", "KidLand")

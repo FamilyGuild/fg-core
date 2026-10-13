@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from pathlib import Path
 
 import dbzero as db0
@@ -11,10 +10,8 @@ from fg_core.commands import (
     configure_dashboard_widget,
     create_family,
     enable_module,
-    switch_active_member,
 )
 from fg_core.models import CorePreferences, FamilyGuildAppState, Member, MemberRole
-from fg_core.queries import get_active_member
 
 
 @pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
@@ -123,8 +120,24 @@ def test_create_family_initializes_singleton_root() -> None:
     assert app_state.preferences.family_display_name == "Guild House"
     assert app_state.preferences.currency_name == "FamCoins"
     assert app_state.preferences.language_preference == "en"
-    assert app_state.active_member_state.active_member is None
-    assert app_state.active_member_state.last_switched_at is None
+    assert not hasattr(app_state, "active_member_state")
+
+
+def test_create_family_initializes_default_root_created_during_startup() -> None:
+    default_state = FamilyGuildAppState()
+
+    app_state = create_family(
+        "Guild House",
+        currency_name="Stars",
+        language_preference="pl",
+        household_key="guild-house",
+    )
+
+    assert app_state is default_state
+    assert app_state.family.household_key == "guild-house"
+    assert app_state.preferences.family_display_name == "Guild House"
+    assert app_state.preferences.currency_name == "Stars"
+    assert app_state.preferences.language_preference == "pl"
 
 
 def test_app_state_has_single_family_reference_not_family_collection() -> None:
@@ -180,55 +193,6 @@ def test_add_child_member(app_state: FamilyGuildAppState) -> None:
     assert child in app_state.family.members
 
 
-def test_switch_active_member_changes_active_member(app_state: FamilyGuildAppState) -> None:
-    parent = add_parent_member(app_state, "Ada")
-    switched_at = datetime(2026, 6, 20, 12, 0, tzinfo=UTC)
-
-    active_state = switch_active_member(app_state, parent, switched_at=switched_at)
-
-    assert active_state.active_member is parent
-    assert active_state.last_switched_at == switched_at
-    assert get_active_member(app_state) is parent
-
-
-def test_switch_rejects_inactive_member(app_state: FamilyGuildAppState) -> None:
-    parent = add_parent_member(app_state, "Ada")
-    child = add_child_member(app_state, "Alex")
-    switch_active_member(app_state, parent)
-    child.active = False
-
-    with pytest.raises(ValueError, match="inactive"):
-        switch_active_member(app_state, child)
-
-    assert get_active_member(app_state) is parent
-
-
-def test_switch_rejects_unknown_member(app_state: FamilyGuildAppState) -> None:
-    parent = add_parent_member(app_state, "Ada")
-    switch_active_member(app_state, parent)
-    unknown_child = Member("Riley", MemberRole.child)
-
-    with pytest.raises(ValueError, match="belong"):
-        switch_active_member(app_state, unknown_child)
-
-    assert get_active_member(app_state) is parent
-
-
-def test_switch_rejects_value_equal_nonmember(app_state: FamilyGuildAppState) -> None:
-    parent = add_parent_member(app_state, "Ada")
-    switched_at = datetime(2026, 6, 20, 12, 0, tzinfo=UTC)
-    switch_active_member(app_state, parent, switched_at=switched_at)
-    detached = Member("Ada", MemberRole.parent)
-    assert detached == parent
-    assert db0.uuid(detached) != db0.uuid(parent)
-
-    with pytest.raises(ValueError, match="belong"):
-        switch_active_member(app_state, detached)
-
-    assert db0.uuid(get_active_member(app_state)) == db0.uuid(parent)
-    assert app_state.active_member_state.last_switched_at == switched_at
-
-
 @pytest.mark.parametrize("existing", [False, True])
 def test_widget_rejects_value_equal_nonmember(
     app_state: FamilyGuildAppState, existing: bool
@@ -256,7 +220,7 @@ def test_widget_rejects_value_equal_nonmember(
         assert widgets[0].position == 2
 
 
-def test_member_commands_accept_refetched_member_after_reopen(
+def test_widget_command_accepts_refetched_member_after_reopen(
     app_state: FamilyGuildAppState, dbzero_state: Path
 ) -> None:
     child = add_child_member(app_state, "Alex")
@@ -267,12 +231,10 @@ def test_member_commands_accept_refetched_member_after_reopen(
     restored_state = FamilyGuildAppState()
     restored_member = db0.fetch(member_uuid, Member)
 
-    active_state = switch_active_member(restored_state, restored_member)
     widget = configure_dashboard_widget(
         restored_state, "kidland", "balance", visible_for_member=restored_member
     )
 
-    assert db0.uuid(active_state.active_member) == member_uuid
     assert db0.uuid(widget.visible_for_member) == member_uuid
 
 

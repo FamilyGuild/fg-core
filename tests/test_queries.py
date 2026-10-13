@@ -1,14 +1,15 @@
+from pathlib import Path
+
 import dbzero as db0
 
 from fg_core.commands import (
     add_child_member,
+    add_parent_member,
     configure_dashboard_widget,
     enable_module,
-    switch_active_member,
 )
-from fg_core.models import CorePreferences, FamilyGuildAppState, ModuleRegistration
+from fg_core.models import CorePreferences, FamilyGuildAppState, Member, ModuleRegistration
 from fg_core.queries import (
-    get_active_member_uuid,
     get_app_state,
     get_core_preferences,
     get_enabled_modules,
@@ -16,6 +17,7 @@ from fg_core.queries import (
     get_general_dashboard_config,
     get_member_switcher_options,
     get_visible_navigation,
+    resolve_trusted_member,
 )
 
 
@@ -42,13 +44,54 @@ def test_get_core_preferences(app_state: FamilyGuildAppState) -> None:
     assert preferences is app_state.preferences
 
 
-def test_get_active_member_uuid_is_derived_from_active_member(app_state: FamilyGuildAppState) -> None:
-    assert get_active_member_uuid(app_state) is None
-
+def test_resolve_trusted_member_returns_active_household_member(
+    app_state: FamilyGuildAppState,
+) -> None:
+    parent = add_parent_member(app_state, "Ada")
     child = add_child_member(app_state, "Alex")
-    switch_active_member(app_state, child)
 
-    assert get_active_member_uuid(app_state) == db0.uuid(child)
+    assert resolve_trusted_member(app_state, db0.uuid(parent)) is parent
+    assert resolve_trusted_member(app_state, db0.uuid(child)) is child
+
+
+def test_resolve_trusted_member_returns_none_without_valid_active_member(
+    app_state: FamilyGuildAppState,
+) -> None:
+    inactive_child = add_child_member(app_state, "Alex")
+    inactive_child.active = False
+    detached = Member("Riley", inactive_child.role)
+
+    assert resolve_trusted_member(app_state, None) is None
+    assert resolve_trusted_member(app_state, "") is None
+    assert resolve_trusted_member(app_state, "unknown-member") is None
+    assert resolve_trusted_member(app_state, db0.uuid(inactive_child)) is None
+    assert resolve_trusted_member(app_state, db0.uuid(detached)) is None
+
+
+def test_resolve_trusted_member_distinguishes_duplicate_names(
+    app_state: FamilyGuildAppState,
+) -> None:
+    first = add_child_member(app_state, "Alex")
+    second = add_child_member(app_state, "Alex")
+
+    assert resolve_trusted_member(app_state, db0.uuid(first)) is first
+    assert resolve_trusted_member(app_state, db0.uuid(second)) is second
+
+
+def test_resolve_trusted_member_after_reopen(
+    app_state: FamilyGuildAppState, dbzero_state: Path
+) -> None:
+    child = add_child_member(app_state, "Alex")
+    member_id = db0.uuid(child)
+    db0.commit()
+    db0.close()
+    db0.init(str(dbzero_state / "db0"), prefix="core")
+
+    restored_state = FamilyGuildAppState()
+    restored_member = resolve_trusted_member(restored_state, member_id)
+
+    assert restored_member is not None
+    assert db0.uuid(restored_member) == member_id
 
 
 def test_member_switcher_options_include_only_active_members(app_state: FamilyGuildAppState) -> None:
