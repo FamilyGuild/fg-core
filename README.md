@@ -137,3 +137,32 @@ the household.
 For testing from another device on a trusted local network, start with
 `--host 0.0.0.0` and open `http://<computer-ip>:8090`. Do not expose this
 unauthenticated MVP directly to the internet.
+
+### Enable local module navigation
+
+Stop the application before updating the same state directory from a separate
+process. For an initialized household, enable KidLand with the existing command:
+
+```bash
+./.venv/bin/python - <<'PY'
+import dbzero as db0
+
+from fg_core.commands import enable_module
+from fg_core.queries import get_app_state
+
+db0.init("app-data/dbzero", prefix="core")
+enable_module(get_app_state(), "kidland", "KidLand")
+db0.close()
+PY
+```
+
+Restart the application, choose a member and open KidLand from the navigation.
+The local entry URL is `/modules/kidland`; it currently renders a temporary entry
+page, not KidLand workflows or a module dashboard. Home returns to `/`.
+
+Household registrations own labels and enabled state; `web_ui/module_navigation.py`
+only maps locally integrated keys to routes. Enabled registrations without local
+routes appear without links. Disabled modules are hidden and their entry pages
+are unavailable, including through direct URLs. Registration changes are read on
+render and route entry, not polled in already open views. Startup never enables
+modules automatically. Full translated label selection is deferred.

@@ -1,13 +1,14 @@
 """Trusted member switching shell for the private FamilyGuild MVP."""
 
-from collections.abc import MutableMapping
+from collections.abc import Callable, MutableMapping
 from typing import Any
 
 import dbzero as db0
 from nicegui import app, events, ui
 
 from fg_core.models import FamilyGuildAppState, Member, MemberRole
-from fg_core.queries import get_member_switcher_options, resolve_trusted_member
+from fg_core.queries import get_member_switcher_options, get_visible_navigation, resolve_trusted_member
+from web_ui.module_navigation import MODULE_ENTRY_ROUTES, render_module_entry
 
 SELECTED_MEMBER_KEY = "selected_member_id"
 
@@ -42,7 +43,26 @@ def build_shell(app_state: FamilyGuildAppState) -> None:
 
         context_container = ui.column().classes("w-full gap-3").mark("member-context")
 
+        def render_home() -> None:
+            """Render the existing minimal family home placeholder."""
+            with ui.card().classes("w-full").mark("home-area"):
+                ui.label("Family home")
+
+        def render_selected_module(module_key: str) -> None:
+            """Resolve current client identity before opening a module entry."""
+            if _resolve_stored_member(app_state, storage) is not None:
+                render_module_entry(app_state, module_key)
+
+        def bind_module_route(module_key: str) -> Callable[[], None]:
+            """Bind a local module key without exposing query-bindable arguments."""
+            def render_route() -> None:
+                """Render only the module captured by this local route."""
+                render_selected_module(module_key)
+
+            return render_route
+
         def render_member_context() -> None:
+            """Refresh member-dependent navigation and the current route."""
             member = _resolve_stored_member(app_state, storage)
             context_container.clear()
             with context_container:
@@ -51,11 +71,28 @@ def build_shell(app_state: FamilyGuildAppState) -> None:
                     return
 
                 ui.label(f"{member.display_name} · {member.role}").mark("selected-member")
-                with ui.card().classes("w-full").mark("home-area"):
-                    ui.label("Family home")
+                with ui.row().mark("module-navigation"):
+                    ui.link("Home", "/").mark("home-link")
+                    for module in get_visible_navigation(app_state):
+                        route = MODULE_ENTRY_ROUTES.get(module.module_key)
+                        if route is None:
+                            ui.label(module.navigation_label.value).mark(
+                                f"module-unmapped-{module.module_key}"
+                            )
+                        else:
+                            ui.link(module.navigation_label.value, route).mark(
+                                f"module-link-{module.module_key}"
+                            )
                 if member.role == MemberRole.parent:
                     with ui.card().classes("w-full").mark("parent-only-area"):
                         ui.label("Parent members and settings")
+                ui.sub_pages({
+                    "/": render_home,
+                    **{
+                        route: bind_module_route(key)
+                        for key, route in MODULE_ENTRY_ROUTES.items()
+                    },
+                })
 
         def select_member(event: events.ValueChangeEventArguments[Any]) -> None:
             member_id = event.value if isinstance(event.value, str) else None
