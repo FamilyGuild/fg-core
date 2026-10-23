@@ -2,11 +2,39 @@ import asyncio
 
 import dbzero as db0
 import httpx
+import pytest
 from nicegui import app, core, ui
 from nicegui.testing import User, user_simulation
 
 from fg_core.models import FamilyGuildAppState, Member
 from web_ui.shell import SELECTED_MEMBER_KEY, build_shell
+
+
+@pytest.mark.parametrize("path", ["/members", "/settings", "/modules/kidland"])
+@pytest.mark.parametrize("target_role", ["parent", "child"])
+async def test_member_selection_opens_home(
+    app_state: FamilyGuildAppState,
+    parent_member: Member,
+    child_member: Member,
+    path: str,
+    target_role: str,
+) -> None:
+    """Every valid profile selection leaves the previous route and opens Home."""
+    async with user_simulation(root=lambda: build_shell(app_state)) as user:
+        await user.open("/")
+        _select_member(user, db0.uuid(parent_member))
+        await user.should_see(marker="home-area")
+        await user.open(path)
+        await user.should_not_see(marker="home-area")
+        if target_role == "parent":
+            _select_member(user, db0.uuid(child_member))
+            await user.should_not_see(marker="parent-only-area")
+            await user.open(path)
+        target = parent_member if target_role == "parent" else child_member
+        _select_member(user, db0.uuid(target))
+        await user.should_see(marker="home-area")
+        assert user.client.sub_pages_router.current_path == "/"
+        await user.should_not_see(marker="setup-denied")
 
 
 def _select_member(user: User, member_id: str | None) -> None:

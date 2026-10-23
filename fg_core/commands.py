@@ -21,6 +21,70 @@ SUPPORTED_MEMBER_ROLES = {
 }
 
 
+def initialize_household(
+    app_state: FamilyGuildAppState,
+    family_display_name: str,
+    parent_name: str,
+    currency_name: str = "FamCoins",
+    language_preference: str = "en",
+) -> Member:
+    """Configure an empty household and return its first parent atomically.
+
+    Reject repeated setup even when the previous members are inactive. Existing
+    registrations and the internal household key remain unchanged.
+    """
+    _validate_required_text(parent_name, "parent_name")
+    with db0.atomic():
+        if len(app_state.family.members):
+            raise ValueError("Household already has members.")
+        update_preferences(app_state, family_display_name, currency_name, language_preference)
+        return add_parent_member(app_state, parent_name)
+
+
+def update_preferences(
+    app_state: FamilyGuildAppState,
+    family_display_name: str,
+    currency_name: str,
+    language_preference: str,
+) -> None:
+    """Validate and atomically update family-facing preferences, not identity keys."""
+    _validate_required_text(family_display_name, "family_display_name")
+    _validate_required_text(currency_name, "currency_name")
+    _validate_language_preference(language_preference)
+    with db0.atomic():
+        app_state.preferences.family_display_name = family_display_name
+        app_state.preferences.currency_name = currency_name
+        app_state.preferences.language_preference = language_preference
+
+
+def rename_member(app_state: FamilyGuildAppState, member_id: str, display_name: str) -> None:
+    """Rename a household member without changing identity or relationships."""
+    _validate_required_text(display_name, "display_name")
+    with db0.atomic():
+        _managed_member(app_state, member_id).display_name = display_name
+
+
+def set_member_active(app_state: FamilyGuildAppState, member_id: str, active: bool) -> None:
+    """Change membership availability while preserving at least one active parent."""
+    with db0.atomic():
+        member = _managed_member(app_state, member_id)
+        if member.active and member.role == MemberRole.parent and not active:
+            if not any(
+                other.active and other.role == MemberRole.parent and other != member
+                for other in app_state.family.members
+            ):
+                raise ValueError("The last active parent cannot be deactivated.")
+        member.active = active
+
+
+def _managed_member(app_state: FamilyGuildAppState, member_id: str) -> Member:
+    """Resolve an active or inactive management target within this household."""
+    for member in app_state.family.members:
+        if db0.uuid(member) == member_id:
+            return member
+    raise ValueError("Member does not belong to this household.")
+
+
 def create_family(
     family_display_name: str,
     currency_name: str = "FamCoins",

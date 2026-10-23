@@ -54,7 +54,8 @@ async def test_direct_entry_requires_selection_and_preserves_it_on_reload(
         await user.should_not_see(marker='module-entry-kidland')
         with user:
             user.find(marker='member-switcher').elements.pop().set_value(db0.uuid(child_member))
-        await user.should_see(marker='module-entry-kidland')
+        await user.should_see(marker='home-area')
+        assert user.client.sub_pages_router.current_path == '/'
         await user.open('/modules/kidland')
         await user.should_see(marker='module-entry-kidland')
         child_member.active = False
@@ -124,6 +125,8 @@ async def test_module_route_keeps_clients_independent_and_tabs_synchronized(
         await parent.open('/modules/kidland')
         with parent:
             parent.find(marker='member-switcher').elements.pop().set_value(db0.uuid(parent_member))
+        await parent.should_see(marker='home-area')
+        await parent.open('/modules/kidland')
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(core.app), base_url='http://test',
         ) as child_client:
@@ -131,6 +134,8 @@ async def test_module_route_keeps_clients_independent_and_tabs_synchronized(
             await child.open('/modules/kidland')
             with child:
                 child.find(marker='member-switcher').elements.pop().set_value(db0.uuid(child_member))
+            await child.should_see(marker='home-area')
+            await child.open('/modules/kidland')
             await parent.should_see(marker='parent-only-area')
             await child.should_not_see(marker='parent-only-area')
             await child.should_see(marker='module-entry-kidland')
@@ -143,7 +148,8 @@ async def test_module_route_keeps_clients_independent_and_tabs_synchronized(
                 with tab:
                     tab.find(marker='member-switcher').elements.pop().set_value(db0.uuid(child_member))
                 await parent.should_not_see(marker='parent-only-area', retries=20)
-                await parent.should_see(marker='module-entry-kidland')
+                await parent.should_see(marker='home-area')
+                assert parent.client.sub_pages_router.current_path == '/'
                 with tab:
                     tab.find(marker='member-switcher').elements.pop().set_value(None)
                 await parent.should_see(marker='member-unselected', retries=20)

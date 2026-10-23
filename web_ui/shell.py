@@ -8,6 +8,7 @@ from nicegui import app, events, ui
 
 from fg_core.models import FamilyGuildAppState, Member, MemberRole
 from fg_core.queries import get_member_switcher_options, get_visible_navigation, resolve_trusted_member
+from web_ui.family_setup import render_initial_setup, render_members_page, render_settings_page
 from web_ui.module_navigation import MODULE_ENTRY_ROUTES, render_module_entry
 
 SELECTED_MEMBER_KEY = "selected_member_id"
@@ -25,7 +26,7 @@ def build_shell(app_state: FamilyGuildAppState) -> None:
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-4 gap-4").mark("shell"):
         ui.label("FamilyGuild").classes("text-2xl font-bold")
-        ui.label(app_state.preferences.family_display_name).classes("text-lg")
+        family_label = ui.label(app_state.preferences.family_display_name).classes("text-lg")
 
         member_select = (
             ui.select(
@@ -37,9 +38,10 @@ def build_shell(app_state: FamilyGuildAppState) -> None:
             .classes("w-full")
             .mark("member-switcher")
         )
+        empty_members = ui.label("Add a family member to choose a profile.").mark("empty-members")
+        empty_members.set_visibility(not options)
         if not options:
             member_select.disable()
-            ui.label("Add a family member to choose a profile.").mark("empty-members")
 
         context_container = ui.column().classes("w-full gap-3").mark("member-context")
 
@@ -68,6 +70,8 @@ def build_shell(app_state: FamilyGuildAppState) -> None:
             with context_container:
                 if member is None:
                     ui.label("Choose a family member to continue.").mark("member-unselected")
+                    if not len(app_state.family.members):
+                        render_initial_setup(app_state, storage, SELECTED_MEMBER_KEY, refresh_shell)
                     return
 
                 ui.label(f"{member.display_name} · {member.role}").mark("selected-member")
@@ -85,9 +89,16 @@ def build_shell(app_state: FamilyGuildAppState) -> None:
                             )
                 if member.role == MemberRole.parent:
                     with ui.card().classes("w-full").mark("parent-only-area"):
-                        ui.label("Parent members and settings")
+                        ui.link("Members", "/members").mark("members-link")
+                        ui.link("Settings", "/settings").mark("settings-link")
                 ui.sub_pages({
                     "/": render_home,
+                    "/members": lambda: render_members_page(
+                        app_state, storage, SELECTED_MEMBER_KEY, refresh_shell,
+                    ),
+                    "/settings": lambda: render_settings_page(
+                        app_state, storage, SELECTED_MEMBER_KEY, refresh_shell,
+                    ),
                     **{
                         route: bind_module_route(key)
                         for key, route in MODULE_ENTRY_ROUTES.items()
@@ -95,6 +106,7 @@ def build_shell(app_state: FamilyGuildAppState) -> None:
                 })
 
         def select_member(event: events.ValueChangeEventArguments[Any]) -> None:
+            """Resolve client selection and open Home whenever a valid member is chosen."""
             member_id = event.value if isinstance(event.value, str) else None
             member = resolve_trusted_member(app_state, member_id)
             if member is None:
@@ -105,15 +117,36 @@ def build_shell(app_state: FamilyGuildAppState) -> None:
             else:
                 storage[SELECTED_MEMBER_KEY] = db0.uuid(member)
             render_member_context()
+            if member is not None:
+                ui.navigate.to("/")
 
         member_select.on_value_change(select_member)
-        render_member_context()
+
+        def refresh_shell() -> None:
+            """Refresh household controls and role-sensitive content after a mutation."""
+            synchronize_member()
+            render_member_context()
 
         def synchronize_member() -> None:
+            """Refresh current membership options and invalidate stale client selection."""
+            current_options = {
+                db0.uuid(member): _member_option_label(member)
+                for member in get_member_switcher_options(app_state)
+            }
+            options_changed = member_select.options != current_options
+            if options_changed:
+                member_select.set_options(current_options)
+            member_select.set_enabled(bool(current_options))
+            empty_members.set_visibility(not current_options)
+            family_label.set_text(app_state.preferences.family_display_name)
             member = _resolve_stored_member(app_state, storage)
             member_id = db0.uuid(member) if member is not None else None
             if member_select.value != member_id:
                 member_select.set_value(member_id)
+            elif options_changed:
+                render_member_context()
+
+        render_member_context()
 
         # Shared user storage does not refresh controls in other open tabs.
         ui.timer(0.1, synchronize_member)

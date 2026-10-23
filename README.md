@@ -101,34 +101,39 @@ local chat stack ports. Runtime settings can be overridden when needed:
   --port 8090
 ```
 
-### Prepare a new local household
+### Prepare and manage a local household
 
-The member setup UI belongs to a later task. To prepare a fresh private test
-state, stop the application and run this once with the same state directory:
+Open the application with a fresh state directory. The initial setup form asks
+for the family name, first parent name, currency label (default `FamCoins`) and
+language preference (`en` or `pl`). Saving configures the household atomically
+and selects that parent only in the current browser profile. No preparation
+script is required. Startup never creates demonstration members or overwrites
+the household, and an outdated setup form cannot reinitialize it.
 
-```bash
-./.venv/bin/python - <<'PY'
-import dbzero as db0
+With a parent selected, open **Members** (`/members`) to add parents or children,
+rename them, or deactivate/reactivate them. Members retain their UUIDs and
+relationships; permanent deletion and role changes are not offered. The last
+active parent cannot be deactivated. Deactivating your own profile clears your
+selection if another active parent remains. Adding a child here does not create
+a KidLand profile.
 
-from fg_core.commands import add_child_member, add_parent_member, create_family
+Open **Settings** (`/settings`) to change the family display name, currency label
+or language preference. Currency renaming does not change balances; full shell
+translation is still pending. The household key and runtime settings are not
+editable here. All writes recheck the current active parent, including forms
+opened before a profile switch. This is trusted switching, not authentication.
 
-db0.init("app-data/dbzero", prefix="core")
-state = create_family("My Family")
-add_parent_member(state, "Parent")
-add_child_member(state, "Child")
-db0.commit()
-db0.close()
-PY
-```
-
-Do not run the preparation snippet again against an initialized household. The
-normal application startup never creates demonstration members or overwrites
-the household.
+Initial setup is available only when there are no members at all. Existing
+households retain their data. If an older or manually modified state has members
+but no active parent, stop the application and repair the local state manually;
+the UI intentionally does not offer a reset or unauthenticated recovery flow.
 
 ### Trusted member behavior
 
 - Each browser profile or device keeps its own selected member.
 - Tabs in the same browser profile share the selection.
+- Choosing a member opens Home (`/`), including when the selection is synchronized
+  to another tab. Reloading a page without changing the selection preserves its route.
 - The selected member is revalidated against current active household members
   whenever the shell is opened.
 - Selecting a profile does not require a password. This is trusted switching

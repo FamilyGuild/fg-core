@@ -43,6 +43,8 @@ Use trusted member switching because the founder's own family is the first test 
 - `AI_docs/` contains implementation plans and summaries only; official documentation under `../fg-docs/docs/` is the sole source of truth.
 - Do not add `AI_docs/` files to `mkdocs.yml` navigation unless the developer explicitly asks.
 
-## Dependency Default
+## Development Defaults
+
+- Document every model field in the model's docstring using an `Attributes` section (or the language-equivalent documentation). Explain its domain meaning, relationships, defaults and optional values, and relevant units, constraints or lifecycle rules; do not merely repeat its name and type. Keep descriptions synchronized with model changes.
 
 - Use `dbzero-pro>=0.6.0` as the distribution dependency while retaining `import dbzero as db0` and dbzero state-management terminology.
